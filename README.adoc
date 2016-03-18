@@ -25,11 +25,11 @@ Instead, you could communicate via *view objects*.
 * instead of exposing the internal domain, you'll map your information to these view objects and export these instead.
 * when an external party provides information, you'll map his view object to your external domain.
 
-TIP: View objects offers you the ablitity to alter your internal domain without having effect on your communication with other systems, or your front-end!
+View objects offers you the ablitity to alter your internal domain without having effect on your communication with other systems, or your front-end!
 
 === What is a mapper?
 [.lead]
-TIP: A mapper is a component which is responsible to map object A to object B.
+A mapper is a component which is responsible to map object A to object B.
 They are very commonly used to convert domain objects to view objects, and vica versa.
 
 

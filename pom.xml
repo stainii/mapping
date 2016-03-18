@@ -12,9 +12,9 @@
         <module>orika</module>
     </modules>
     
-    <build>
+<!--    <build>
         <plugins>
-            <!-- this plugin will generate asciidoc -->
+             this plugin will generate asciidoc 
             <plugin>
                 <groupId>org.asciidoctor</groupId>
                 <artifactId>asciidoctor-maven-plugin</artifactId>
@@ -29,11 +29,12 @@
                     </execution>
                 </executions>
                 <configuration>
+                    <sourceDocumentName>../../../README.adoc</sourceDocumentName>
                     <backend>html5</backend>
                 </configuration>
             </plugin>
         </plugins>
-    </build>
+    </build>-->
     
     <dependencyManagement>
         <dependencies>
