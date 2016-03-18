@@ -1,0 +1,348 @@
+:hardbreaks:
+:numbered:
+:toc: left
+
+= Mapping strategies and frameworks
+Stijn Hooft <stijnhooft@hotmail.com>
+16/03/2016
+
+== What are mappers and why would I use them?
+=== Why do I have to map in the first place?
+==== The problem
+In distributed systems, several components talk to each other.
+
+* The back-end will pass objects to the front-end and vice versa.
+* Other applications communicate with your application via a contract.
+
+You could use your domain objects to communicate with them.
+That leaves you in a tight position: whenever you want to change something on you domain, the other parties need to change on their end too. Or worse: whenever another party decides they want the data in a different structure, you need to adapt your domain model!
+
+Point: *you don't want to expose you internal domain*.
+
+==== A solution
+Instead, you could communicate via *view objects*.
+
+* instead of exposing the internal domain, you'll map your information to these view objects and export these instead.
+* when an external party provides information, you'll map his view object to your external domain.
+
+TIP: View objects offers you the ablitity to alter your internal domain without having effect on your communication with other systems, or your front-end!
+
+=== What is a mapper?
+[.lead]
+TIP: A mapper is a component which is responsible to map object A to object B.
+They are very commonly used to convert domain objects to view objects, and vica versa.
+
+
+=== Why having separate mappers?
+
+Where do you convert objects from one type to another? Sometimes, you'll see that the mapping of is done in a business logic layer, or a controller. I don't think this is a good idea, for various reasons.
+
+.Reasons to have separate mappers
+* reusability
+** you will probably use the same objects everywhere, so, when you don't have a mapper, you need to repeat the mapping of these objects everywhere. That's not a great idea.
+** mapping is not always 1-on-1. Sometimes, you need to do very specific thing to map from A to B. This knowledge is encapsulated in 1 place, not repeated in every business logic layer.
+* testability
+** the mapping itself can be tested separately
+** in the business logic layer tests, you can mock the mapper
+* readability, separation of concerns
+** a business logic layer already has enough duties. Do not add the mapping as an extra duty.
+
+== When to call mappers
+We never let a domain object leave or enter the service. The outside world only knows VOs, it does not know about our internal domain.
+
+* Before returning a domain object, we map it to a VO.
+* When a VO is passed to the method as a parameter, we map it to a domain object to do our logic with it (for example: persisting it in the database).
+
+== Where to call mappers
+=== In the back-end?
+The *safest place* to trigger mapping, is *during a transaction*.
+If you use JPA, you will probably have some lazy loaded attributes, for example lists. When the mapper tries to copy over an *unloaded attribute, outside a transaction*, you'll get *an exception*.
+
+=== In the front-end?
+One could also argue that *the back-end should not know anything about view objects; they are only meant for a front-end.*
+Then, you'll need to map in the front-end instead of the business logic layer.
+
+== Mapping Frameworks
+How do we actually create these mappers?
+
+* we could *create specific mapper classes by hand*
+** which is a lot of work (you should call all getters and setters, keep the mapping up to date when adding or removing attributes, ...)
+** but gives you complete freedom
+* we could use *a mapping framework*
+** which can do a lot of work for us
+** and is still pretty configurable.
+** however, if you want to map very specific stuff, some time needs to be invested in figuring out how the framework can be configured.
+** in *rare* cases, you cannot configure a specific need and still need to map by hand.
+
+
+== Comparison between manual mapping and using a mapping framework
+
+[cols="3*", options="header"]
+|===
+|Topic
+|Manual mapping
+|Mapping framework
+
+|Boilerplate code
+|You can keep things very easy and straightforward, but you have to write it all yourself.
+|You need to integrate a framework, which always requires some code.
+
+|Time and effort
+|Writing mappers yourself takes *a large amount of time*. And... it's boring.
+Don't forget that you will propably have to write mapping in both directions.
+|Once your framework is set up, you could write mappings in very little time, depending on how complex your mapping is.
+Is it 1-on-1? Then you have to do almost nothing.
+Almost everytime you'll get bidirectional mapping for free!
+Writing custom mapping is not hard and goes relatively fast.
+
+|Refactorability
+|Since you only write Java code, your IDE can very easily refactor changes for you.
+|You define property names as Strings, which is not automatically refactored
+
+|Speed
+|The fastest solution
+|A framework should do it's internal configuration first, which takes a little more time. For more details on how much time this takes, check out the <<Further reading>> section.
+
+|===
+
+*When you need to do a large amount of mappings, I would recommend a mapping framework*, especially when the mappings are 1-on-1. All the developers will be grateful: writing custom mappers takes a lot of time and is very boring.
+
+Using a framework has also a cost, although little: you need to learn how to use the framework and write some integration code. You will also lose some refactorability, because these frameworks often work with String constants or XML. Mapping framework also function a little bit slower, however, this should not be a bottleneck.
+
+== Example
+=== What will we demonstrate
+==== Strategies
+In this demo, we will demonstrate some common mappings by
+
+* creating our mappers manually
+* using Orika as a mapping framework
+
+We use CDI to inject our mappers.
+
+==== Challenges
+We will tackle the following challenges:
+
+* simple 1-on-1 mapping
+* mapping of lists
+* dealing with bidirectional relationships
+* mapping to a different object structure
+* mapping of a list to a set and vica versa
+* custom mapping: one class to another class
+* mapping of a Date to an XMLGregorianCalendar
+
+NOTE: This only scratches the top of the possibe situation you'll encounter with mapping. If you need more information about a specific challenge, I suggest you check out the <<Further reading>> section.
+
+=== The project structure
+The example consists of multiple Maven projects.
+
+* parent
+** which can be used to build all projects at the same time
+** contains this documentation
+*** in AsciiDoc format: src/main/asciidoc
+*** in HTML, after a Maven build: target/generated-docs
+* core
+** contains the domain objects and the view objects
+* manual
+** contains the hand-written mappers
+** contains tests for the hand-written mappers
+* orika
+** contains the Orika mapper configuration
+** contains tests for the Orika mapper configuration
+
+=== How does manual mapping work
+Manual mapping is very straight forward.
+
+We create a new class: a Mapper. This will contain a "mapToVO" and "mapToDomain" method.
+For example, to map a Store to a StoreVO and vice versa, we create a StoreMapper.
+
+[source, Java]
+----
+...
+
+@ApplicationScoped
+public class StoreMapper {
+    
+    public StoreVO mapToVO(Store store) {
+        StoreVO storeVO = new StoreVO();
+        storeVO.setName(store.getName());
+        storeVO.setAddress(store.getAddress());
+        return storeVO;
+    }
+    
+    public Store mapToDomain(StoreVO storeVO) {
+        Store store = new Store();
+        store.setName(storeVO.getName());
+        store.setAddress(storeVO.getAddress());
+        return store;
+    }
+
+}
+----
+
+This mapper will be injected in our Services, for example the ExampleService.
+
+[source, Java]
+----
+...
+
+public class ExampleService {
+    
+    @Inject
+    private StoreMapper storeMapper;
+
+    ...
+    
+    public StoreVO findStore(String name) {
+        Store store = new Store(); //in reality, we should call a repository which searches for a store.
+        
+        //we don't want to expose our domain Store, so let's map it to a StoreVO
+        StoreVO storeVO = storeMapper.mapToVO(store);
+        return storeVO;
+    }
+
+    ...
+}
+----
+
+=== How does Orika mapping work
+
+We create a *MapperProducer*. This will configure the Orika mapping framework.
+
+The configuration is done in a method, which returns a *MapperFacade*.
+This is the interface with which our business logic layer will be able to execute mappings.
+
+We need to tell this method which configuration we want to retrieve.
+Do we want to get a mapper for User details? Then we pass a MapperType "USER".
+
+Now we could inject the MapperProducer, and call the getMapper method.
+
+[source, Java]
+----
+...
+
+@ApplicationScoped
+public class MapperProducer {
+
+    ...
+    
+    public MapperFacade getMapper(MapperType type) {
+        if (!mappers.containsKey(type)) {
+            MapperFactory factory = new DefaultMapperFactory.Builder().build();
+            configureMapperFactory(factory, type);
+            mappers.put(type, factory.getMapperFacade());
+        }
+
+        return mappers.get(type);
+    }
+
+    public void configureMapperFactory(MapperFactory factory, MapperType type) {
+        ...
+        switch (type) {
+            case STORE: configureStoreMapper(factory);
+                        break;
+            ...
+        }
+    }
+
+    private void configureStoreMapper(MapperFactory factory) {
+        factory.classMap(Store.class, StoreVO.class)
+            .byDefault()    
+            .register();
+    }
+
+    ...
+}
+----
+
+[source, Java]
+----
+...
+
+public class ExampleService {
+
+    @Inject
+    private MapperProducer mapperProducer;
+
+    public StoreVO findStore(String name) {
+        Store store = new Store(); //in reality, we should call a repository which searches for a store.
+        
+        //we don't want to expose our domain Store, so let's map it to a StoreVO
+        MapperFacade storeMapper = mapperProducer.getMapper(MapperType.STORE);
+        StoreVO storeVO = storeMapper.mapToVO(store);
+        return storeVO;
+    }
+
+    ...
+}
+----
+
+We could skip this last step, however. We could expose the getMapper method as a CDI Producer.
+We create a custom annotation (@Mapper), and register the CDI producer for this annotation.
+
+[source, Java]
+----
+...
+
+@ApplicationScoped
+public class MapperProducer {
+    
+    ...
+
+    @Produces
+    @Mapper(type = MapperType.UNDEFINED)
+    public MapperFacade getMapper(InjectionPoint ip) {
+        MapperType type = ip.getAnnotated().getAnnotation(Mapper.class).type();
+        if (!mappers.containsKey(type)) {
+            MapperFactory factory = new DefaultMapperFactory.Builder().build();
+            configureMapperFactory(factory, type);
+            mappers.put(type, factory.getMapperFacade());
+        }
+
+        return mappers.get(type);
+    }
+
+    public void configureMapperFactory(MapperFactory factory, MapperType type) {
+        ...
+        switch (type) {
+            case STORE: configureStoreMapper(factory);
+                        break;
+            ...
+        }
+    }
+
+    private void configureStoreMapper(MapperFactory factory) {
+        factory.classMap(Store.class, StoreVO.class)
+            .byDefault()
+            .register();
+    }
+
+    ...
+}
+
+----
+
+[source, Java]
+----
+...
+
+public class ExampleService {
+
+    @Inject
+    @Mapper(type = MapperType.STORE)
+    private MapperFacade storeMapper;
+
+    public StoreVO findStore(String name) {
+        Store store = new Store(); //in reality, we should call a repository which searches for a store.
+        
+        //we don't want to expose our domain Store, so let's map it to a StoreVO
+        StoreVO storeVO = storeMapper.mapToVO(store);
+        return storeVO;
+    }
+
+    ...
+}
+----
+
+== Further reading
+The Orika docs: http://orika-mapper.github.io/orika-docs/index.html
+Some speed tests between manual mapping, Orika and Dozer: http://blog.sokolenko.me/2013/05/dozer-vs-orika-vs-manual.html
