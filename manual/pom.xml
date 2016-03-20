@@ -5,6 +5,7 @@
     <artifactId>manual</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
+    <name>mapping-manual</name>
     
     <parent>
         <artifactId>parent</artifactId>
@@ -49,5 +50,4 @@
 
         
     </dependencies>
-    
 </project>

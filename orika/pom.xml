@@ -5,6 +5,7 @@
     <artifactId>orika</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
+    <name>mapping-orika</name>
     
     <parent>
         <artifactId>parent</artifactId>
@@ -56,5 +57,4 @@
         </dependency>
 
     </dependencies>
-    
 </project>
